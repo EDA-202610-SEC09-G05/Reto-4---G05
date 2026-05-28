@@ -94,24 +94,45 @@ def print_req_1(control):
 
 def print_req_2(control):
 
-    cluster = input("Cluster origen: ")
-    radio = float(input("Radio (km): "))
+    start = l.get_time()
+
+    cluster = input("Ingrese el identificador de la zona: ").strip()
+    radio = float(input("Ingrese el radio (km): "))
 
     r = l.req_2(control, cluster, radio)
 
+    end = l.get_time()
+
     if "error" in r:
-        print(r["error"])
+        print("\nError:", r["error"])
         return
 
-    print("\nRESULTADO REQ 2\n")
-    print(f"Zona: {r['zona_origen']}")
-    print(f"Radio: {r['radio']}")
-    print(f"Total zonas: {r['total_zonas']}\n")
+    print("\n" + "="*60)
+    print("REQ. 2 — Área de influencia de una zona")
+    print("="*60)
+    print(f"Zona origen: {r['zona_origen']}")
+    print(f"Radio: {r['radio']} km")
+    print(f"Total zonas encontradas: {r['total_zonas']}")
+    print(f"Tiempo ejecución: {round(l.delta_time(start, end), 2)} ms")
+    print("="*60 + "\n")
 
-    for i in range(l.al.size(r["zonas"])):
-        z = l.al.get_element(r["zonas"], i)
+    filas = []
 
-        print(z["id"], z["distancia"], "km")
+    zonas = r["zonas"]
+
+    for i in range(l.al.size(zonas)):
+        z = l.al.get_element(zonas, i)
+
+        filas.append({
+            "ID": z["id"],
+            "Lat": z["lat"],
+            "Lon": z["lon"],
+            "Registros": z["reg"],
+            "Velocidad": z["vel"],
+            "Distancia": z["distancia"]
+        })
+
+    print(tabulate(filas, headers="keys", tablefmt="grid", floatfmt=".5f"))
 
 
 def print_req_3(control):

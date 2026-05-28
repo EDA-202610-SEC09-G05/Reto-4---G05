@@ -283,25 +283,27 @@ def req_2(catalog, cluster_id, radio):
 
         if v is not None:
 
-            distancia = haversine(
-                lat_base,
-                lon_base,
-                v["lat"],
-                v["lon"]
-            )
+            lat = v.get("lat")
+            lon = v.get("lon")
 
-            if distancia <= radio:
+            if lat is not None and lon is not None:
 
-                registro = {
-                    "id": v["id"],
-                    "lat": v["lat"],
-                    "lon": v["lon"],
-                    "reg": v["count"],
-                    "vel": v["avg_sog"],
-                    "distancia": round(distancia, 2)
-                }
+                distancia = haversine(lat_base, lon_base, lat, lon)
 
-                al.add_last(respuesta, registro)
+                if distancia <= radio:
+
+                    registro = {
+                        "id": v["id"],
+                        "lat": lat,
+                        "lon": lon,
+                        "reg": v["count"] if v["count"] is not None else "Unknown",
+                        "vel": v["avg_sog"] if v["avg_sog"] is not None else "Unknown",
+                        "distancia": round(distancia, 2)
+                    }
+
+                    al.add_last(respuesta, registro)
+
+    sort.merge_sort(respuesta, comparar_req2, al)
 
     return {
         "zona_origen": cluster_id,
@@ -311,12 +313,12 @@ def req_2(catalog, cluster_id, radio):
     }
 
 
-def comparar_zonas_req2(elem_1, elem_2):
+def comparar_req2(a, b):
 
-    if elem_1["distancia"] != elem_2["distancia"]:
-        return elem_1["distancia"] < elem_2["distancia"]
+    if a["distancia"] != b["distancia"]:
+        return a["distancia"] < b["distancia"]
 
-    return str(elem_1["id"]) < str(elem_2["id"])
+    return str(a["id"]) < str(b["id"])
 
 
 def req_3(catalog, n):
