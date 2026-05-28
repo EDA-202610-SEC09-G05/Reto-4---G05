@@ -272,25 +272,42 @@ def req_1(catalog):
     if origen_id == destino_id:
         return {"error": "El origen y el destino son la misma zona"}
 
-    # BFS: menor número de arcos
-    bfs_result = bfs.BreadthFirstSearch(catalog["g_distance"], origen_id)
+    # BFS manual: menor número de arcos
+    visitados = {origen_id: None}  # vertice: predecesor
+    cola = [origen_id]
+    encontrado = False
 
-    if not bfs.hasPathTo(bfs_result, destino_id):
+    while cola:
+        actual = cola.pop(0)
+
+        if actual == destino_id:
+            encontrado = True
+            break
+
+        adyacentes = G.adjacents(catalog["g_distance"], actual)
+        total = al.size(adyacentes)
+
+        for i in range(total):
+            vecino = al.get_element(adyacentes, i)
+            if vecino not in visitados:
+                visitados[vecino] = actual
+                cola.append(vecino)
+
+    if not encontrado:
         return {
             "existe_trayectoria": False,
             "mensaje": f"No existe trayectoria entre '{origen_id}' y '{destino_id}'"
         }
 
-    # pathTo retorna pila -> convertir a lista origen->destino
-    path_stack = bfs.pathTo(bfs_result, destino_id)
-    camino = al.new_list()
+    # Reconstruir camino
+    camino = []
+    actual = destino_id
+    while actual is not None:
+        camino.append(actual)
+        actual = visitados[actual]
+    camino.reverse()
 
-    while not path_stack["size"] == 0:
-        vid = path_stack["elements"][path_stack["size"] - 1]
-        path_stack["size"] -= 1
-        al.add_last(camino, vid)
-
-    total_zonas = al.size(camino)
+    total_zonas = len(camino)
 
     if total_zonas <= 10:
         indices = list(range(total_zonas))
@@ -299,7 +316,7 @@ def req_1(catalog):
 
     vertices_mostrar = al.new_list()
     for i in indices:
-        vid = al.get_element(camino, i)
+        vid = camino[i]
         al.add_last(vertices_mostrar, _info_vertice_req1(catalog, vid))
 
     return {
@@ -350,9 +367,6 @@ def _info_vertice_req1(catalog, vid):
         "num_embarcaciones": len(mmsi_unicos),
         "nombres": ", ".join(nombres_mostrar) if nombres_mostrar else "Unknown"
     }
-  
-    pass
-
 
 def req_2(catalog, cluster_id, radio):
 
