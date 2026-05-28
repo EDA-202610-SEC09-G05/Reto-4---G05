@@ -1,8 +1,7 @@
 import sys
 from tabulate import tabulate
-import logic as l 
+from App import logic as l
 import DataStructures.Map.map_linear_probing as mc
-from logic import print_vertice, print_menu
 
 def new_logic():
     """
@@ -11,73 +10,80 @@ def new_logic():
     return l.new_logic()
 
 def load_data(control):
-    """
-    Carga los datos
-    """
-    #TODO: Realizar la carga de datos
-    numero_data = input("Ingrese el número de datos a cargar entre 20, 40, 60, 80, 100: ")
+
+    numero_data = input("Ingrese el tamaño de datos (20, 40, 60, 80, 100): ")
+
     while numero_data not in ["20", "40", "60", "80", "100"]:
-        print("Número de datos no válido")
-        numero_data = input("Ingrese el número de datos a cargar entre 20, 40, 60, 80, 100: ")
-        
-    input_file = f"ais_maritime_traffic_{numero_data}pct.csv"
-    datos = l.load_data(control, input_file)
-    
-    print(f"\nTiempo de carga: {datos['tiempo']} ms")
-    print(f"Total de embarcaciones: {datos['total_vessels']}")
-    print(f"Total de registros: {datos['total_records']}")
-    print(f"Total de vértices: {datos['total_vertices']}")
-    print(f"Total de arcos: {datos['total_arcos']}")
-    
+        print("Valor inválido")
+        numero_data = input("Ingrese el tamaño de datos (20, 40, 60, 80, 100): ")
+
+    filename = f"ais_maritime_traffic_{numero_data}pct.csv"
+
+    catalog, tiempo = l.load_data(control, filename)
+
+    # ===== RESUMEN =====
+    total_vertices = l.G.order(catalog["g_distance"])
+    total_edges = l.G.size(catalog["g_distance"])
+
+    print("\n========== RESULTADOS ==========\n")
+    print(f"Tiempo de carga: {round(tiempo, 2)} ms")
+    print(f"Total de registros: {catalog['total_records']}")
+    print(f"Total de vértices: {total_vertices}")
+    print(f"Total de arcos: {total_edges}")
+
+    # ===== PRIMEROS Y ÚLTIMOS =====
     print("\nPrimeros 5 vértices:")
-    primeros_5 = []
-    
-    for i in range(len(datos["primeros_5"])):
-        vertice = datos["primeros_5"][i]
-        vertice_info = print_vertice(vertice)
-        primeros_5.append(vertice_info)
-    print(tabulate(primeros_5, headers="keys", tablefmt="fancy_grid"))
-    
+    show_vertices(catalog, 0, 5)
+
     print("\nÚltimos 5 vértices:")
-    ultimos_5 = []
+    size = l.al.size(catalog["creation_order"])
+    show_vertices(catalog, size-5, size)
     
-    for i in range(len(datos["ultimos_5"])):
-        vertice = datos["ultimos_5"][i]
-        vertice_info = print_vertice(vertice)
-        ultimos_5.append(vertice_info)
-    print(tabulate(ultimos_5, headers="keys", tablefmt="fancy_grid"))
-    
-    print("\nDatos cargados exitosamente\n")
+    return catalog
+
+def show_vertices(catalog, start, end):
+
+    data = []
+    order = catalog["creation_order"]
+
+    for i in range(start, end):
+        vid = l.al.get_element(order, i)
+
+        entry = mc.get(catalog["vertices_map"], vid)
+        v = entry["value"]
+
+        data.append({
+            "ID": v["id"],
+            "Lat": round(v["lat"], 2) if v.get("lat") else "Unknown",
+            "Lon": round(v["lon"], 2) if v.get("lon") else "Unknown",
+            "Registros": v["count"],
+            "Velocidad Prom": v.get("avg_sog"),
+            "Embarcaciones": l.al.size(v["mmsi"])
+        })
+
+    print(tabulate(data, headers="keys", tablefmt="fancy_grid"))
 
 def print_data(control, id_zona):
-    """
-    Busca y muestra la información detallada de un vértice (zona) por su ID.
-    """
-    # Accedemos al mapa de vértices desde el control
-    # Nota: Asegúrate de que 'vertices_map' sea el nombre de la llave en tu catálogo
 
-    
-    vertice_entry = mc.get(control["vertices_map"], id_zona)
-    
-    if vertice_entry is None:
-        print(f"\n[!] Error: No se encontró la zona con ID: {id_zona}")
+    entry = mc.get(control["vertices_map"], id_zona)
+
+    if entry is None:
+        print("Zona no encontrada")
         return
 
-    # Extraemos el valor real del vértice
-    # (Ajusta ['value'] según cómo devuelva los datos tu implementación de mapa)
-    v = vertice_entry['value']
-    
-    print(f"\n--- INFORMACIÓN DE LA ZONA {id_zona} ---")
+    v = entry["value"]
+
     info = [
-        ["ID", v.get("id", id_zona)],
-        ["Latitud", v.get("lat")],
-        ["Longitud", v.get("lon")],
-        ["Total Registros", v.get("records_count")],
-        ["SOG Promedio", v.get("avg_sog")],
-        ["Cant. Embarcaciones", v.get("mmsi_list_size")] 
+        ["ID", v["id"]],
+        ["Lat", v.get("lat")],
+        ["Lon", v.get("lon")],
+        ["Total registros", v["count"]],
+        ["Velocidad promedio", v.get("avg_sog")],
+        ["# embarcaciones", l.al.size(v["mmsi"])]
     ]
-    
-    print(tabulate(info, headers=["Atributo", "Valor"], tablefmt="fancy_grid"))
+
+    print(tabulate(info, headers=["Campo", "Valor"], tablefmt="fancy_grid"))
+
 
 def print_req_1(control):
     """
@@ -129,8 +135,17 @@ def print_req_6(control):
 # Se crea la lógica asociado a la vista
 control = new_logic()
 
-# main del ejercicio
-import sys
+def print_menu():
+    print("\n========================")
+    print("0. Cargar datos")
+    print("1. Req 1")
+    print("2. Req 2")
+    print("3. Req 3")
+    print("4. Req 4")
+    print("5. Req 5")
+    print("6. Req 6")
+    print("7. Salir")
+    print("========================")
 
 def main():
     """
