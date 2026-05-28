@@ -218,56 +218,50 @@ def print_req_5(control):
         
         
 def print_req_6(control):
-    """
-        Función que imprime la solución del Requerimiento 6 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 6
-    resultado = l.req_6(control)
-    
-    tamano_resultado = al.size(resultado)
-    if tamano_resultado == 0:
-        print("No se encontraron subredes.")
-        return
-    
-    primer_elemento = al.get_element(resultado, 0)
-    total_subredes = primer_elemento["total_subred"]
-    
-    print(f"\nTotal de subredes encontradas: {total_subredes}")
-    
-    print("\nTop 5 subredes con más zonas de navegación:")
-    
-    subredes_tabla = []
-    for i in range(tamano_resultado):
-        subred = al.get_element(resultado, i)
-        lista_nodos = subred["zonas_ids"]
-        total_nodos = al.size(lista_nodos)
-        
-        if total_nodos <= 8:
-            nodos_mostrar = []
-            for j in range(total_nodos):
-                nodo_id = al.get_element(lista_nodos, j)
-                nodos_mostrar.append(str(nodo_id))
-            nodos_str = ", ".join(nodos_mostrar)
-        else:
-            primeros_3 = []
-            for j in range(3):
-                primeros_3.append(str(al.get_element(lista_nodos, j)))
-            ultimos_3 = []
-            for j in range(total_nodos - 3, total_nodos):
-                ultimos_3.append(str(al.get_element(lista_nodos, j)))
-            nodos_str = ", ".join(primeros_3) + ", ..., " + ", ".join(ultimos_3)
-        
-        subred_info = {
-            "ID subred": subred["subred_id"],
-            "Total zonas": subred["total_zonas"],
-            "ID Zonas": nodos_str,
-            "Velocidad promedio": subred["velocidad_promedio"],
-            "Total viajes": subred["total_viajes"]
-        }
-        subredes_tabla.append(subred_info)
-        
-    print(tabulate(subredes_tabla, headers="keys", tablefmt="fancy_grid", floatfmt="", numalign="left" ))
 
+    start = l.get_time()
+
+    resultado = l.req_6(control)
+
+    end = l.get_time()
+
+    size = l.al.size(resultado)
+
+    if size == 0:
+        print("\nNo se encontraron subredes\n")
+        return
+
+    total = l.al.get_element(resultado, 0)["total_subred"]
+
+    print("\n" + "="*60)
+    print("REQ. 6 — Subredes de navegación")
+    print("="*60)
+    print(f"Total de subredes: {total}")
+    print(f"Tiempo ejecución: {round(l.delta_time(start, end), 2)} ms")
+    print("="*60 + "\n")
+
+    filas = []
+
+    for i in range(size):
+
+        r = l.al.get_element(resultado, i)
+        nodos = r["zonas_ids"]
+
+        if len(nodos) <= 6:
+            ids = ", ".join(nodos)
+        else:
+            ids = ", ".join(nodos[:3]) + ", ..., " + ", ".join(nodos[-3:])
+
+        filas.append({
+            "Subred": r["subred_id"],
+            "Zonas": r["total_zonas"],
+            "IDs": ids,
+            "Velocidad prom": r["velocidad_promedio"],
+            "Total viajes": r["total_viajes"]
+        })
+
+    print(tabulate(filas, headers="keys", tablefmt="grid"))
+    
 # Se crea la lógica asociado a la vista
 control = new_logic()
 
