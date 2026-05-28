@@ -47,20 +47,21 @@ def show_vertices(catalog, start, end):
     order = catalog["creation_order"]
 
     for i in range(start, end):
-        vid = l.al.get_element(order, i)
 
-        v = mc.get(catalog["vertices_map"], vid)  
+        vid = l.al.get_element(order, i)
+        v = mc.get(catalog["vertices_map"], vid)
 
         data.append({
             "ID": v["id"],
-            "Lat": round(v["lat"], 2) if v.get("lat") else "Unknown",
-            "Lon": round(v["lon"], 2) if v.get("lon") else "Unknown",
-            "Registros": v["count"],
-            "Velocidad Prom": v.get("avg_sog"),
-            "Embarcaciones": l.al.size(v["mmsi"])
+            "Lat": v["lat"],             
+            "Lon": v["lon"],                 
+            "Reg.": v["count"],             
+            "Vel.": v["avg_sog"],           
+            "3 MMSI": l.get_first_3_mmsi(v["mmsi"])  
         })
 
-    print(tabulate(data, headers="keys", tablefmt="fancy_grid"))
+    print(tabulate(data, headers="keys", tablefmt="grid", floatfmt=".15f"))
+
 
 def print_data(control, id_zona):
 

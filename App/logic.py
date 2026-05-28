@@ -241,6 +241,17 @@ def build_graphs(catalog):
         G.add_edge(catalog["g_distance"], source, target, e["distance"])
         G.add_edge(catalog["g_time"], source, target, avg_time)
 
+def get_first_3_mmsi(lst):
+
+    result = []
+    size = al.size(lst)
+
+    limit = 3 if size >= 3 else size
+
+    for i in range(limit):
+        result.append(str(al.get_element(lst, i)))
+
+    return ", ".join(result)
 
 
 def req_1(catalog):
