@@ -221,14 +221,39 @@ def print_req_3(control):
             imprimir_recursivo(i + 1)
             
     imprimir_recursivo(0)
+    
 def print_req_4(control):
-    """
-        Función que imprime la solución del Requerimiento 4 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 4
-    pass
 
+    origen = input("Ingrese el ID de la zona de origen: ").strip()
+    control["req4_origen"] = origen
 
+    resultado = l.req_4(control)
+
+    print("\n========== REQ 4: RED DE NAVEGACIÓN ÓPTIMA ==========\n")
+
+    if "error" in resultado:
+        print(resultado["error"])
+        return
+
+    print(f"Zona origen:  {resultado['origen']}")
+    print(f"Costo total:  {resultado['costo_total']} km")
+    print(f"Total zonas:  {resultado['total_zonas']}")
+    print(f"Total arcos:  {resultado['total_arcos']}")
+
+    arcos = resultado["arcos"]
+    data = []
+
+    for i in range(al.size(arcos)):
+        a = al.get_element(arcos, i)
+        data.append({
+            "Zona Origen":  a["origen"],
+            "Zona Destino": a["destino"],
+            "Peso (km)":    a["peso"]
+        })
+
+    print(tabulate(data, headers="keys", tablefmt="grid"))
+    
+    
 def print_req_5(control):
 
     origen = input("Origen: ")

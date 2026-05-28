@@ -12,6 +12,8 @@ from DataStructures.Graph import bfs as bfs
 from DataStructures.List import array_list as al
 from DataStructures.Graph import digraph as G
 from DataStructures.Graph import edge as edge
+from DataStructures.Graph import dijsktra_structure as djk
+
  
 csv.field_size_limit(2147483647)
 
@@ -469,14 +471,73 @@ def comparar_arcos_req3(dato_1, dato_2):
     return dato_1["target"] < dato_2["target"]
 
 
-
-
 def req_4(catalog):
-    """
-    Retorna el resultado del requerimiento 4
-    """
-    # TODO: Modificar el requerimiento 4
-    pass
+
+    origen_id = catalog["req4_origen"]
+
+    info_origen = mc.get(catalog["vertices_map"], origen_id)
+
+    if info_origen is None:
+        return {"error": f"La zona '{origen_id}' no existe"}
+
+    visited_map = djk.dijkstra(catalog["g_distance"], origen_id)
+
+    arcos = al.new_list()
+    costo_total = 0
+
+    vertices_list = mp.key_set(visited_map)
+
+    for i in range(al.size(vertices_list)):
+        vid = al.get_element(vertices_list, i)
+        data = mp.get(visited_map, vid)
+
+        if data is None:
+            continue
+
+        edge_from = data.get("edge_from")
+        dist_to = data.get("dist_to", float("inf"))
+
+        if edge_from is not None and dist_to != float("inf"):
+
+            data_from = mp.get(visited_map, edge_from)
+            peso = dist_to - data_from.get("dist_to", 0)
+
+            arco = {
+                "origen": edge_from,
+                "destino": vid,
+                "peso": round(peso, 2)
+            }
+
+            al.add_last(arcos, arco)
+            costo_total += peso
+
+    sort.merge_sort(arcos, comparar_arcos_req4, al)
+
+    total_arcos = al.size(arcos)
+    total_zonas = total_arcos + 1
+
+    if total_arcos <= 10:
+        indices = list(range(total_arcos))
+    else:
+        indices = list(range(5)) + list(range(total_arcos - 5, total_arcos))
+
+    arcos_mostrar = al.new_list()
+    for i in indices:
+        al.add_last(arcos_mostrar, al.get_element(arcos, i))
+
+    return {
+        "origen": origen_id,
+        "costo_total": round(costo_total, 2),
+        "total_zonas": total_zonas,
+        "total_arcos": total_arcos,
+        "arcos": arcos_mostrar
+    }
+
+
+def comparar_arcos_req4(a, b):
+    if str(a["origen"]) != str(b["origen"]):
+        return str(a["origen"]) < str(b["origen"])
+    return str(a["destino"]) < str(b["destino"])
 
 
 def req_5(catalog, origen, destino):
