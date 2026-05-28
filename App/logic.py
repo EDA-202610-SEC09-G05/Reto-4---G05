@@ -11,6 +11,7 @@ from DataStructures.List import sort
 
 from DataStructures.List import array_list as al
 from DataStructures.Graph import digraph as G
+
 csv.field_size_limit(2147483647)
 
 def new_logic():
@@ -76,16 +77,12 @@ def format_record(row):
 def load_vertex(catalog, record):
 
     cid = record["cluster"]
-    entry = mc.get(catalog["vertices_map"], cid)
+    vertex = mc.get(catalog["vertices_map"], cid)
 
-    if entry is None:
+    if vertex is None:
         vertex = new_vertex(cid)
         mc.put(catalog["vertices_map"], cid, vertex)
         al.add_last(catalog["creation_order"], cid)
-    else:
-        vertex = entry["value"]
-
-    update_vertex(vertex, record)
 
     update_vertex(vertex, record)
     
@@ -118,9 +115,7 @@ def compute_vertex_averages(catalog):
     for i in range(al.size(keys)):
 
         cid = al.get_element(keys, i)
-
-        entry = mc.get(catalog["vertices_map"], cid)
-        v = entry["value"]   
+        v = mc.get(catalog["vertices_map"], cid)  
 
         v["lat"] = v["lat_sum"] / v["count"]
         v["lon"] = v["lon_sum"] / v["count"]
@@ -136,6 +131,7 @@ def load_mmsi_map(catalog, record):
         mc.put(catalog["mmsi_map"], mmsi, lst)
 
     al.add_last(lst, record)
+
     
 def build_edges(catalog):
 
@@ -144,16 +140,14 @@ def build_edges(catalog):
     for i in range(al.size(keys)):
 
         mmsi = al.get_element(keys, i)
-
-        entry = mc.get(catalog["mmsi_map"], mmsi)
-        records = entry["value"]
+        records = mc.get(catalog["mmsi_map"], mmsi)
 
         sort.merge_sort(records, compare_time, al)
 
-        for j in range(al.size(records)-1):
+        for j in range(al.size(records) - 1):
 
             a = al.get_element(records, j)
-            b = al.get_element(records, j+1)
+            b = al.get_element(records, j + 1)
 
             if a["cluster"] != b["cluster"]:
                 add_edge_info(catalog, a, b)
@@ -163,32 +157,31 @@ def compare_time(a, b):
 
 def add_edge_info(catalog, a, b):
 
-    key = a["cluster"] + "-" + b["cluster"]
+    source = a["cluster"]
+    target = b["cluster"]
 
-    edge_entry = mc.get(catalog["edges_map"], key)
+    v1 = mc.get(catalog["vertices_map"], source)
+    v2 = mc.get(catalog["vertices_map"], target)
 
-    if edge_entry is None:
+    if v1 is None or v2 is None:
+        return
 
-        v1_entry = mc.get(catalog["vertices_map"], a["cluster"])
-        v2_entry = mc.get(catalog["vertices_map"], b["cluster"])
+    key = source + "-" + target
+    edge = mc.get(catalog["edges_map"], key)
 
-        v1 = v1_entry["value"]  
-        v2 = v2_entry["value"]  
+    if edge is None:
 
         dist = haversine(v1["lat"], v1["lon"], v2["lat"], v2["lon"])
 
         edge = {
-            "source": a["cluster"],
-            "target": b["cluster"],
+            "source": source,
+            "target": target,
             "distance": dist,
             "count": 0,
             "time_sum": 0
         }
 
         mc.put(catalog["edges_map"], key, edge)
-
-    else:
-        edge = edge_entry["value"]  # ✅
 
     time = time_diff(a["time"], b["time"])
 
@@ -222,24 +215,31 @@ def build_graphs(catalog):
     for i in range(al.size(keys)):
         vid = al.get_element(keys, i)
 
-        G.insert_vertex(catalog["g_distance"], vid, vid)
-        G.insert_vertex(catalog["g_time"], vid, vid)
+        if not G.contains_vertex(catalog["g_distance"], vid):
+            G.insert_vertex(catalog["g_distance"], vid, None)
+
+        if not G.contains_vertex(catalog["g_time"], vid):
+            G.insert_vertex(catalog["g_time"], vid, None)
 
     ekeys = mc.key_set(catalog["edges_map"])
 
     for i in range(al.size(ekeys)):
 
-        k = al.get_element(ekeys, i)
+        key = al.get_element(ekeys, i)
+        e = mc.get(catalog["edges_map"], key)
 
-        entry = mc.get(catalog["edges_map"], k)
-        e = entry["value"]
+        source = e["source"]
+        target = e["target"]
+
+        if not G.contains_vertex(catalog["g_distance"], source):
+            continue
+        if not G.contains_vertex(catalog["g_distance"], target):
+            continue
 
         avg_time = e["time_sum"] / e["count"]
 
-        G.add_edge(catalog["g_distance"], e["source"], e["target"], e["distance"])
-        G.add_edge(catalog["g_time"], e["source"], e["target"], avg_time)
-        
-
+        G.add_edge(catalog["g_distance"], source, target, e["distance"])
+        G.add_edge(catalog["g_time"], source, target, avg_time)
 
 
 

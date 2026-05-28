@@ -1,7 +1,7 @@
 import sys
 from tabulate import tabulate
 from App import logic as l
-import DataStructures.Map.map_linear_probing as mc
+import DataStructures.Map.map_separate_chaining as mc
 
 def new_logic():
     """
@@ -49,8 +49,7 @@ def show_vertices(catalog, start, end):
     for i in range(start, end):
         vid = l.al.get_element(order, i)
 
-        entry = mc.get(catalog["vertices_map"], vid)
-        v = entry["value"]
+        v = mc.get(catalog["vertices_map"], vid)  
 
         data.append({
             "ID": v["id"],

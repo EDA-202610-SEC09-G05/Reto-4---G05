@@ -17,15 +17,32 @@ def insert_vertex(graph, key, value):
  
  
 def add_edge(graph, key_a, key_b, weight=1):
+
     entry_a = map.get(graph['vertices'], key_a)
     entry_b = map.get(graph['vertices'], key_b)
- 
-    if entry_a is not None and entry_b is not None:
-        vertex_a = entry_a['value']
-        edge = e.new_edge(key_a, key_b, weight)
-        map.put(vertex_a['adjacents'], key_b, edge)
-        graph['num_edges'] += 1
+
+    if entry_a is None:
+        return graph
+    if entry_b is None:
+        return graph
+
+    vertex_a = entry_a.get('value')
+
+    if vertex_a is None:
+        return graph
+
+    if 'adjacents' not in vertex_a:
+        return graph
+
+    edge = e.new_edge(key_b, weight)
+
+    map.put(vertex_a['adjacents'], key_b, edge)
+
+    graph['num_edges'] += 1
+
     return graph
+
+
  
  
 def contains_vertex(graph, key):
