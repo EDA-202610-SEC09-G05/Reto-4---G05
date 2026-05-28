@@ -323,43 +323,33 @@ def comparar_req2(a, b):
 
 def req_3(catalog, n):
     """
-    Retorna el resultado del requerimiento 3
+    Retorna el resultado del requerimiento 3 corregido
     """
+    mapa_arcos = catalog["edges_map"]
+    lista_arcos = mc.value_set(mapa_arcos) 
 
-    mapa_arcos = catalog["edge_info_map"]
-
-    lista_arcos = mp.value_set(mapa_arcos)
-
-    al.merge_sort(lista_arcos, comparar_arcos_req3)
+    sort.merge_sort(lista_arcos, comparar_arcos_req3, al)
 
     salida = al.new_list()
-
     cantidad_total = al.size(lista_arcos)
-
-    if cantidad_total < n:
-        limite = cantidad_total
-    else:
-        limite = n
+    limite = cantidad_total if cantidad_total < n else n
 
     for indice in range(limite):
         arco_actual = al.get_element(lista_arcos, indice)
         distancia_arco = arco_actual["distance"]
-        tiempo_arco = arco_actual["avg_time"]
+        
+        tiempo_arco = round(arco_actual["time_sum"] / arco_actual["count"], 2) if arco_actual["count"] > 0 else 0
 
-        if distancia_arco == None:
-            distancia_arco = "Unknown"
-        if tiempo_arco == None:
-            tiempo_arco = "Unknown"
         datos = {
             "origen": arco_actual["source"],
             "destino": arco_actual["target"],
-            "cantidad_viajes": arco_actual["trips_count"],
-            "distancia": distancia_arco,
+            "cantidad_viajes": arco_actual["count"], # En build_edges usaste "count"
+            "distancia": round(distancia_arco, 2) if distancia_arco is not None else "Unknown",
             "tiempo_promedio": tiempo_arco
         }
         al.add_last(salida, datos)
+        
     return salida
-
 
 def comparar_arcos_req3(dato_1, dato_2):
 
@@ -419,27 +409,24 @@ def req_5(catalog, origen, destino):
 
 
 def construir_info_vertice_req5(catalog, ruta, posicion, total):
-
     identificador = al.get_element(ruta, posicion)
-    info_vertice = mp.get(catalog["vertices_map"], identificador)
-    cantidad_embarcaciones = al.size(info_vertice["mmsi_list"])
+    
+    # Cambiado mp por mc y corregido el nombre de las llaves internas según tu new_vertex
+    info_vertice = mc.get(catalog["vertices_map"], identificador)
+    cantidad_embarcaciones = al.size(info_vertice["mmsi"]) # En new_vertex usaste "mmsi"
     
     if posicion == total - 1:
         peso_siguiente = "N/A (destino final)"
     else:
-
         siguiente = al.get_element(ruta, posicion + 1)
         llave_arco = identificador + "-" + siguiente
-        informacion_arco = mp.get(catalog["edge_info_map"], llave_arco)
-        peso_siguiente = round(informacion_arco["distance"], 2)
+        # Cambiado mp por mc y "edge_info_map" por "edges_map"
+        informacion_arco = mc.get(catalog["edges_map"], llave_arco)
+        peso_siguiente = round(informacion_arco["distance"], 2) if informacion_arco else "Unknown"
 
-    latitud = info_vertice["lat"]
-    longitud = info_vertice["lon"]
+    latitud = info_vertice.get("lat", "Unknown")
+    longitud = info_vertice.get("lon", "Unknown")
 
-    if latitud == None:
-        latitud = "Unknown"
-    if longitud == None:
-        longitud = "Unknown"
     return {
         "id": identificador,
         "lat": latitud,
@@ -447,7 +434,6 @@ def construir_info_vertice_req5(catalog, ruta, posicion, total):
         "num_embarcaciones": cantidad_embarcaciones,
         "peso_arco_sig": peso_siguiente
     }
-
 
 def req_6(catalog):
     """
