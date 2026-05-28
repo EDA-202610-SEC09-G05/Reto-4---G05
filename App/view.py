@@ -1,38 +1,83 @@
 import sys
-
+from tabulate import tabulate
+import logic as l 
+import DataStructures.Map.map_linear_probing as mc
+from logic import print_vertice, print_menu
 
 def new_logic():
     """
-        Se crea una instancia del controlador
+    Se crea una instancia del controlador inicializando las estructuras del grafo y mapas.
     """
-    #TODO: Llamar la función de la lógica donde se crean las estructuras de datos
-    pass
-
-def print_menu():
-    print("Bienvenido")
-    print("0- Cargar información")
-    print("1- Ejecutar Requerimiento 1")
-    print("2- Ejecutar Requerimiento 2")
-    print("3- Ejecutar Requerimiento 3")
-    print("4- Ejecutar Requerimiento 4")
-    print("5- Ejecutar Requerimiento 5")
-    print("6- Ejecutar Requerimiento 6")
-    print("7- Salir")
+    return l.new_logic()
 
 def load_data(control):
     """
     Carga los datos
     """
     #TODO: Realizar la carga de datos
-    pass
+    numero_data = input("Ingrese el número de datos a cargar entre 20, 40, 60, 80, 100: ")
+    while numero_data not in ["20", "40", "60", "80", "100"]:
+        print("Número de datos no válido")
+        numero_data = input("Ingrese el número de datos a cargar entre 20, 40, 60, 80, 100: ")
+        
+    input_file = f"ais_maritime_traffic_{numero_data}pct.csv"
+    datos = l.load_data(control, input_file)
+    
+    print(f"\nTiempo de carga: {datos['tiempo']} ms")
+    print(f"Total de embarcaciones: {datos['total_vessels']}")
+    print(f"Total de registros: {datos['total_records']}")
+    print(f"Total de vértices: {datos['total_vertices']}")
+    print(f"Total de arcos: {datos['total_arcos']}")
+    
+    print("\nPrimeros 5 vértices:")
+    primeros_5 = []
+    
+    for i in range(len(datos["primeros_5"])):
+        vertice = datos["primeros_5"][i]
+        vertice_info = print_vertice(vertice)
+        primeros_5.append(vertice_info)
+    print(tabulate(primeros_5, headers="keys", tablefmt="fancy_grid"))
+    
+    print("\nÚltimos 5 vértices:")
+    ultimos_5 = []
+    
+    for i in range(len(datos["ultimos_5"])):
+        vertice = datos["ultimos_5"][i]
+        vertice_info = print_vertice(vertice)
+        ultimos_5.append(vertice_info)
+    print(tabulate(ultimos_5, headers="keys", tablefmt="fancy_grid"))
+    
+    print("\nDatos cargados exitosamente\n")
 
+def print_data(control, id_zona):
+    """
+    Busca y muestra la información detallada de un vértice (zona) por su ID.
+    """
+    # Accedemos al mapa de vértices desde el control
+    # Nota: Asegúrate de que 'vertices_map' sea el nombre de la llave en tu catálogo
 
-def print_data(control, id):
-    """
-        Función que imprime un dato dado su ID
-    """
-    #TODO: Realizar la función para imprimir un elemento
-    pass
+    
+    vertice_entry = mc.get(control["vertices_map"], id_zona)
+    
+    if vertice_entry is None:
+        print(f"\n[!] Error: No se encontró la zona con ID: {id_zona}")
+        return
+
+    # Extraemos el valor real del vértice
+    # (Ajusta ['value'] según cómo devuelva los datos tu implementación de mapa)
+    v = vertice_entry['value']
+    
+    print(f"\n--- INFORMACIÓN DE LA ZONA {id_zona} ---")
+    info = [
+        ["ID", v.get("id", id_zona)],
+        ["Latitud", v.get("lat")],
+        ["Longitud", v.get("lon")],
+        ["Total Registros", v.get("records_count")],
+        ["SOG Promedio", v.get("avg_sog")],
+        ["Cant. Embarcaciones", v.get("mmsi_list_size")] 
+    ]
+    
+    print(tabulate(info, headers=["Atributo", "Valor"], tablefmt="fancy_grid"))
 
 def print_req_1(control):
     """
@@ -85,39 +130,47 @@ def print_req_6(control):
 control = new_logic()
 
 # main del ejercicio
+import sys
+
 def main():
     """
-    Menu principal
+    Menú principal con control de errores y flujo robusto.
     """
+    control = new_logic()  # Inicializamos las estructuras aquí
     working = True
-    #ciclo del menu
+    
     while working:
         print_menu()
-        inputs = input('Seleccione una opción para continuar\n')
-        if int(inputs) == 0:
+        inputs = input('Seleccione una opción para continuar: ').strip()
+        
+        # Validación: solo permite números y previene el error de VS Code
+        if not inputs.isdigit():
+            print("Entrada inválida. Por favor, ingrese un número del 0 al 7.\n")
+            continue
+            
+        opcion = int(inputs)
+        
+        if opcion == 0:
             print("Cargando información de los archivos ....\n")
-            data = load_data(control)
-        elif int(inputs) == 1:
+            # Actualizamos 'control' con los datos cargados
+            control = load_data(control)
+            
+        elif opcion == 1:
             print_req_1(control)
-
-        elif int(inputs) == 2:
+        elif opcion == 2:
             print_req_2(control)
-
-        elif int(inputs) == 3:
+        elif opcion == 3:
             print_req_3(control)
-
-        elif int(inputs) == 4:
+        elif opcion == 4:
             print_req_4(control)
-
-        elif int(inputs) == 5:
+        elif opcion == 5:
             print_req_5(control)
-
-        elif int(inputs) == 5:
+        elif opcion == 6:  # Corrección: aquí debe ir la opción 6
             print_req_6(control)
-
-        elif int(inputs) == 7:
+        elif opcion == 7:
             working = False
-            print("\nGracias por utilizar el programa") 
+            print("\nGracias por utilizar el programa.")
         else:
             print("Opción errónea, vuelva a elegir.\n")
+            
     sys.exit(0)
