@@ -8,10 +8,11 @@ from DataStructures.Priority_queue import priority_queue as pq
 from DataStructures.Map import map_separate_chaining as mc
 from DataStructures.Map import map_linear_probing as mp
 from DataStructures.List import sort
-
+from DataStructures.Graph import bfs as bfs
 from DataStructures.List import array_list as al
 from DataStructures.Graph import digraph as G
-
+from DataStructures.Graph import edge as edge
+ 
 csv.field_size_limit(2147483647)
 
 def new_logic():
@@ -262,20 +263,126 @@ def req_1(catalog):
     pass
 
 
-def req_2(catalog):
+def req_2(catalog, cluster_id, radio):
     """
     Retorna el resultado del requerimiento 2
     """
-    # TODO: Modificar el requerimiento 2
-    pass
+
+    info_central = mp.get(catalog["vertices_map"], cluster_id)
+
+    if info_central == None:
+        return {"error": f"La zona '{cluster_id}' no existe en los datos."}
+
+    lat_base = info_central["lat"]
+    lon_base = info_central["lon"]
+
+    lista_vertices = G.vertices(catalog["g_distance"])
+    respuesta_zonas = al.new_list()
+
+    total_vertices = al.size(lista_vertices)
+
+    for pos in range(total_vertices):
+
+        codigo_vertice = al.get_element(lista_vertices, pos)
+        datos_vertice = mp.get(catalog["vertices_map"], codigo_vertice)
+        if datos_vertice != None:
+
+            if datos_vertice["lat"] != None and datos_vertice["lon"] != None:
+
+                distancia_actual = haversine(
+                    lat_base,
+                    lon_base,
+                    datos_vertice["lat"],
+                    datos_vertice["lon"]
+                )
+
+                if distancia_actual <= radio:
+
+                    velocidad = datos_vertice["avg_sog"]
+
+                    if velocidad == None:
+                        velocidad = "Unknown"
+
+                    registro = {
+                        "id": datos_vertice["id"],
+                        "lat": datos_vertice["lat"],
+                        "lon": datos_vertice["lon"],
+                        "records_count": datos_vertice["records_count"],
+                        "avg_sog": velocidad,
+                        "distancia": round(distancia_actual, 2)
+                    }
+
+                    al.add_last(respuesta_zonas, registro)
+
+    al.merge_sort(respuesta_zonas, comparar_zonas_req2)
+
+    return {
+        "zona_origen": cluster_id,
+        "radio": radio,
+        "total_zonas": al.size(respuesta_zonas),
+        "zonas": respuesta_zonas
+    }
 
 
-def req_3(catalog):
+def comparar_zonas_req2(elem_1, elem_2):
+
+    if elem_1["distancia"] != elem_2["distancia"]:
+        return elem_1["distancia"] < elem_2["distancia"]
+
+    return str(elem_1["id"]) < str(elem_2["id"])
+
+
+def req_3(catalog, n):
     """
     Retorna el resultado del requerimiento 3
     """
-    # TODO: Modificar el requerimiento 3
-    pass
+
+    mapa_arcos = catalog["edge_info_map"]
+
+    lista_arcos = mp.value_set(mapa_arcos)
+
+    al.merge_sort(lista_arcos, comparar_arcos_req3)
+
+    salida = al.new_list()
+
+    cantidad_total = al.size(lista_arcos)
+
+    if cantidad_total < n:
+        limite = cantidad_total
+    else:
+        limite = n
+
+    for indice in range(limite):
+        arco_actual = al.get_element(lista_arcos, indice)
+        distancia_arco = arco_actual["distance"]
+        tiempo_arco = arco_actual["avg_time"]
+
+        if distancia_arco == None:
+            distancia_arco = "Unknown"
+        if tiempo_arco == None:
+            tiempo_arco = "Unknown"
+        datos = {
+            "origen": arco_actual["source"],
+            "destino": arco_actual["target"],
+            "cantidad_viajes": arco_actual["trips_count"],
+            "distancia": distancia_arco,
+            "tiempo_promedio": tiempo_arco
+        }
+        al.add_last(salida, datos)
+    return salida
+
+
+def comparar_arcos_req3(dato_1, dato_2):
+
+    if dato_1["trips_count"] != dato_2["trips_count"]:
+        return dato_1["trips_count"] > dato_2["trips_count"]
+
+    if dato_1["source"] != dato_2["source"]:
+        return dato_1["source"] < dato_2["source"]
+
+    return dato_1["target"] < dato_2["target"]
+
+
 
 
 def req_4(catalog):
@@ -286,20 +393,287 @@ def req_4(catalog):
     pass
 
 
-def req_5(catalog):
-    """
-    Retorna el resultado del requerimiento 5
-    """
-    # TODO: Modificar el requerimiento 5
-    pass
+def req_5(catalog, origen, destino):
+
+    grafo_distancias = catalog["g_distance"]
+
+    if not G.contains_vertex(grafo_distancias, origen):
+        return {"error": f"La zona de origen '{origen}' no existe en el grafo."}
+
+    if not G.contains_vertex(grafo_distancias, destino):
+        return {"error": f"La zona de destino '{destino}' no existe en el grafo."}
+
+    estructura_busqueda = bfs.dijkstra(grafo_distancias, origen)
+    existe_camino = bfs.has_path_to(destino, estructura_busqueda)
+
+    if existe_camino == False:
+        return {
+            "existe_ruta": False,
+            "origen": origen,
+            "destino": destino
+        }
+        
+    costo_final = bfs.dist_to(destino, estructura_busqueda)
+    camino_original = bfs.path_to(destino, estructura_busqueda)
+    ruta_ordenada = al.new_list()
+    posicion = al.size(camino_original) - 1
+    
+    while posicion >= 0:
+        elemento = al.get_element(camino_original, posicion)
+        al.add_last(ruta_ordenada, elemento)
+        posicion -= 1
+        
+    total_vertices = al.size(ruta_ordenada)
+    vertices_respuesta = al.new_list()
+    if total_vertices <= 10:
+        for indice in range(total_vertices):
+
+            info = construir_info_vertice_req5(
+                catalog,
+                ruta_ordenada,
+                indice,
+                total_vertices
+            )
+
+            al.add_last(vertices_respuesta, info)
+
+    else:
+
+        for indice in range(5):
+
+            info_inicio = construir_info_vertice_req5(
+                catalog,
+                ruta_ordenada,
+                indice,
+                total_vertices
+            )
+
+            al.add_last(vertices_respuesta, info_inicio)
+        inicio_final = total_vertices - 5
+        
+        for indice in range(inicio_final, total_vertices):
+            info_fin = construir_info_vertice_req5(
+                catalog,
+                ruta_ordenada,
+                indice,
+                total_vertices
+            )
+            al.add_last(vertices_respuesta, info_fin)
+
+    return {
+        "existe_ruta": True,
+        "origen": origen,
+        "destino": destino,
+        "costo_total": round(costo_final, 2),
+        "total_zonas": total_vertices,
+        "total_arcos": total_vertices - 1,
+        "vertices": vertices_respuesta
+    }
+
+
+def construir_info_vertice_req5(catalog, ruta, posicion, total):
+
+    identificador = al.get_element(ruta, posicion)
+    info_vertice = mp.get(catalog["vertices_map"], identificador)
+    cantidad_embarcaciones = al.size(info_vertice["mmsi_list"])
+    
+    if posicion == total - 1:
+        peso_siguiente = "N/A (destino final)"
+    else:
+
+        siguiente = al.get_element(ruta, posicion + 1)
+        llave_arco = identificador + "-" + siguiente
+        informacion_arco = mp.get(catalog["edge_info_map"], llave_arco)
+        peso_siguiente = round(informacion_arco["distance"], 2)
+
+    latitud = info_vertice["lat"]
+    longitud = info_vertice["lon"]
+
+    if latitud == None:
+        latitud = "Unknown"
+    if longitud == None:
+        longitud = "Unknown"
+    return {
+        "id": identificador,
+        "lat": latitud,
+        "lon": longitud,
+        "num_embarcaciones": cantidad_embarcaciones,
+        "peso_arco_sig": peso_siguiente
+    }
+
 
 def req_6(catalog):
     """
     Retorna el resultado del requerimiento 6
     """
-    # TODO: Modificar el requerimiento 6
-    pass
 
+    grafo_principal = catalog["g_distance"]
+    lista_nodos = G.vertices(grafo_principal)
+    numero_vertices = G.order(grafo_principal)
+    if numero_vertices == 0:
+        return al.new_list()
+    grafo_aux = crear_grafo_no_dirigido(
+        grafo_principal,
+        lista_nodos,
+        numero_vertices,
+        catalog
+    )
+    mapa_visitados = mp.new_map(numero_vertices * 2, 0.5)
+    componentes = al.new_list()
+    for indice in range(numero_vertices):
+
+        nodo_base = al.get_element(lista_nodos, indice)
+
+        if not mp.contains(mapa_visitados, nodo_base):
+
+            estructura = mp.new_map(numero_vertices * 2, 0.5)
+
+            mp.put(estructura, nodo_base, {
+                "edge_to": None,
+                "dist_to": 0
+            })
+            bfs.bfs_vertex(grafo_aux, nodo_base, estructura)
+            datos_componente = procesar_subred(
+                lista_nodos,
+                numero_vertices,
+                estructura,
+                mapa_visitados,
+                catalog
+            )
+            al.add_last(componentes, datos_componente)
+
+    al.merge_sort(componentes, comparar_subredes)
+    respuesta = al.new_list()
+    cantidad_componentes = al.size(componentes)
+
+    if cantidad_componentes > 5:
+        limite = 5
+    else:
+        limite = cantidad_componentes
+
+    for posicion in range(limite):
+
+        componente = al.get_element(componentes, posicion)
+
+        registro = {
+            "subred_id": posicion + 1,
+            "total_subred": cantidad_componentes,
+            "total_zonas": componente["total_zonas"],
+            "zonas_ids": componente["nodos"],
+            "total_viajes": componente["total_viajes"],
+            "velocidad_promedio": componente["velocidad_promedio"]
+        }
+
+        al.add_last(respuesta, registro)
+
+    return respuesta
+
+
+def comparar_ids_ascendente(valor_1, valor_2):
+
+    return int(valor_1) < int(valor_2)
+
+
+def comparar_subredes(red_1, red_2):
+
+    if red_1["total_zonas"] != red_2["total_zonas"]:
+        return red_1["total_zonas"] > red_2["total_zonas"]
+
+    return red_1["min_vertex_id"] < red_2["min_vertex_id"]
+
+
+def crear_grafo_no_dirigido(grafo_original, vertices, total, catalog):
+
+    nuevo_grafo = G.new_graph(total)
+
+    for indice in range(total):
+
+        codigo = al.get_element(vertices, indice)
+
+        informacion = mp.get(catalog["vertices_map"], codigo)
+
+        G.insert_vertex(nuevo_grafo, codigo, informacion)
+
+    for indice in range(total):
+
+        vertice_actual = al.get_element(vertices, indice)
+        lista_adyacentes = G.edges_vertex(grafo_original, vertice_actual)
+        tamano_ady = al.size(lista_adyacentes)
+       
+        for pos in range(tamano_ady):
+            arco_actual = al.get_element(lista_adyacentes, pos)
+            vecino = edge.to(arco_actual)
+            
+            if vertice_actual != vecino:
+                conexiones_regreso = G.edges_vertex(grafo_original, vecino)
+                encontrado = False
+                cantidad_regresos = al.size(conexiones_regreso)
+                
+                for k in range(cantidad_regresos):
+                    arco_retorno = al.get_element(conexiones_regreso, k)
+                    destino_retorno = edge.to(arco_retorno)
+                    if destino_retorno == vertice_actual:
+                        encontrado = True
+                        break
+                if encontrado == True:
+                    G.add_edge(nuevo_grafo, vertice_actual, vecino, 1.0)
+                    G.add_edge(nuevo_grafo, vecino, vertice_actual, 1.0)
+
+    return nuevo_grafo
+
+
+def procesar_subred(vertices, total_vertices, mapa_recorrido, mapa_visitados, catalog):
+
+    lista_ids = al.new_list()
+    acumulado_viajes = 0
+    acumulado_velocidad = 0.0
+    viajes_correctos = True
+    velocidades_correctas = True
+
+    for indice in range(total_vertices):
+        id_actual = al.get_element(vertices, indice)
+        if mp.contains(mapa_recorrido, id_actual):
+            mp.put(mapa_visitados, id_actual, True)
+            al.add_last(lista_ids, id_actual)
+            info_actual = mp.get(catalog["vertices_map"], id_actual)
+            if info_actual != None:
+                if "records_count" in info_actual:
+                    if info_actual["records_count"] != None:
+                        acumulado_viajes += info_actual["records_count"]
+                    else:
+                        viajes_correctos = False
+                else:
+                    viajes_correctos = False
+                if "avg_sog" in info_actual:
+                    if info_actual["avg_sog"] != None:
+                        acumulado_velocidad += info_actual["avg_sog"]
+                    else:
+                        velocidades_correctas = False
+                else:
+                    velocidades_correctas = False
+            else:
+                viajes_correctos = False
+                velocidades_correctas = False
+
+    al.merge_sort(lista_ids, comparar_ids_ascendente)
+    cantidad_zonas = al.size(lista_ids)
+    if cantidad_zonas > 0 and velocidades_correctas == True:
+        promedio = round(acumulado_velocidad / cantidad_zonas, 2)
+    else:
+        promedio = "Unknown"
+    if viajes_correctos == False:
+        acumulado_viajes = "Unknown"
+    if cantidad_zonas > 0:
+        menor_id = int(al.get_element(lista_ids, 0))
+    else:
+        menor_id = float('inf')
+    return {
+        "total_zonas": cantidad_zonas,
+        "nodos": lista_ids,
+        "total_viajes": acumulado_viajes,
+        "velocidad_promedio": promedio,
+        "min_vertex_id": menor_id
+    }
 
 # Funciones para medir tiempos de ejecucion
 
