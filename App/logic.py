@@ -256,10 +256,101 @@ def get_first_3_mmsi(lst):
 
 
 def req_1(catalog):
-    """
-    Retorna el resultado del requerimiento 1
-    """
-    # TODO: Modificar el requerimiento 1
+
+    origen_id = catalog["req1_origen"]
+    destino_id = catalog["req1_destino"]
+
+    info_origen = mc.get(catalog["vertices_map"], origen_id)
+    info_destino = mc.get(catalog["vertices_map"], destino_id)
+
+    if info_origen is None:
+        return {"error": f"La zona de origen '{origen_id}' no existe"}
+
+    if info_destino is None:
+        return {"error": f"La zona de destino '{destino_id}' no existe"}
+
+    if origen_id == destino_id:
+        return {"error": "El origen y el destino son la misma zona"}
+
+    # BFS: menor número de arcos
+    bfs_result = bfs.BreadthFirstSearch(catalog["g_distance"], origen_id)
+
+    if not bfs.hasPathTo(bfs_result, destino_id):
+        return {
+            "existe_trayectoria": False,
+            "mensaje": f"No existe trayectoria entre '{origen_id}' y '{destino_id}'"
+        }
+
+    # pathTo retorna pila -> convertir a lista origen->destino
+    path_stack = bfs.pathTo(bfs_result, destino_id)
+    camino = al.new_list()
+
+    while not path_stack["size"] == 0:
+        vid = path_stack["elements"][path_stack["size"] - 1]
+        path_stack["size"] -= 1
+        al.add_last(camino, vid)
+
+    total_zonas = al.size(camino)
+
+    if total_zonas <= 10:
+        indices = list(range(total_zonas))
+    else:
+        indices = list(range(5)) + list(range(total_zonas - 5, total_zonas))
+
+    vertices_mostrar = al.new_list()
+    for i in indices:
+        vid = al.get_element(camino, i)
+        al.add_last(vertices_mostrar, _info_vertice_req1(catalog, vid))
+
+    return {
+        "existe_trayectoria": True,
+        "origen": origen_id,
+        "destino": destino_id,
+        "total_zonas": total_zonas,
+        "total_arcos": total_zonas - 1,
+        "vertices": vertices_mostrar
+    }
+
+
+def _info_vertice_req1(catalog, vid):
+
+    v = mc.get(catalog["vertices_map"], vid)
+
+    if v is None:
+        return {
+            "id": vid,
+            "lat": "Unknown",
+            "lon": "Unknown",
+            "num_embarcaciones": "Unknown",
+            "nombres": "Unknown"
+        }
+
+    names_lst = v.get("names", al.new_list())
+    mmsi_lst = v.get("mmsi", al.new_list())
+    total_nombres = al.size(names_lst)
+
+    nombres_mostrar = []
+    if total_nombres <= 6:
+        for i in range(total_nombres):
+            nombres_mostrar.append(str(al.get_element(names_lst, i)))
+    else:
+        for i in range(3):
+            nombres_mostrar.append(str(al.get_element(names_lst, i)))
+        for i in range(total_nombres - 3, total_nombres):
+            nombres_mostrar.append(str(al.get_element(names_lst, i)))
+
+    mmsi_unicos = set()
+    for i in range(al.size(mmsi_lst)):
+        mmsi_unicos.add(al.get_element(mmsi_lst, i))
+
+    return {
+        "id": vid,
+        "lat": v.get("lat", "Unknown"),
+        "lon": v.get("lon", "Unknown"),
+        "num_embarcaciones": len(mmsi_unicos),
+        "nombres": ", ".join(nombres_mostrar) if nombres_mostrar else "Unknown"
+    }
+  
     pass
 
 

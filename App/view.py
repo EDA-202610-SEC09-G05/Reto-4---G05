@@ -86,10 +86,45 @@ def print_data(control, id_zona):
 
 
 def print_req_1(control):
-    """
-        Función que imprime la solución del Requerimiento 1 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 1
+    
+    origen = input("Ingrese el ID de la zona de origen: ").strip()
+    destino = input("Ingrese el ID de la zona de destino: ").strip()
+
+    control["req1_origen"] = origen
+    control["req1_destino"] = destino
+
+    resultado = l.req_1(control)
+
+    print("\n========== REQ 1: TRAYECTORIA ENTRE ZONAS ==========\n")
+
+    if "error" in resultado:
+        print(resultado["error"])
+        return
+
+    if not resultado["existe_trayectoria"]:
+        print(resultado["mensaje"])
+        return
+
+    print(f"Zona origen:   {resultado['origen']}")
+    print(f"Zona destino:  {resultado['destino']}")
+    print(f"Total zonas:   {resultado['total_zonas']}")
+    print(f"Total arcos:   {resultado['total_arcos']}")
+
+    vertices = resultado["vertices"]
+    data = []
+
+    for i in range(al.size(vertices)):
+        v = al.get_element(vertices, i)
+        data.append({
+            "ID Zona":         v["id"],
+            "Lat":             v["lat"],
+            "Lon":             v["lon"],
+            "# Embarcaciones": v["num_embarcaciones"],
+            "Nombres":         v["nombres"]
+        })
+
+    print(tabulate(data, headers="keys", tablefmt="grid"))
+   
     pass
 
 def print_req_2(control):
