@@ -76,7 +76,7 @@ def adjacents(graph, key):
  
  
 def vertices(graph):
-    return map.key_set(graph['vertices'])
+    return graph['vertices']
  
  
 def edges_vertex(graph, key):
