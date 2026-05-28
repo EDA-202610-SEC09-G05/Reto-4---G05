@@ -264,63 +264,50 @@ def req_1(catalog):
 
 
 def req_2(catalog, cluster_id, radio):
-    """
-    Retorna el resultado del requerimiento 2
-    """
 
-    info_central = mp.get(catalog["vertices_map"], cluster_id)
+    info_central = mc.get(catalog["vertices_map"], cluster_id)
 
-    if info_central == None:
-        return {"error": f"La zona '{cluster_id}' no existe en los datos."}
+    if info_central is None:
+        return {"error": f"La zona '{cluster_id}' no existe"}
 
     lat_base = info_central["lat"]
     lon_base = info_central["lon"]
 
-    lista_vertices = G.vertices(catalog["g_distance"])
-    respuesta_zonas = al.new_list()
+    lista_vertices = mc.key_set(catalog["vertices_map"])
+    respuesta = al.new_list()
 
-    total_vertices = al.size(lista_vertices)
+    for i in range(al.size(lista_vertices)):
 
-    for pos in range(total_vertices):
+        vid = al.get_element(lista_vertices, i)
+        v = mc.get(catalog["vertices_map"], vid)
 
-        codigo_vertice = al.get_element(lista_vertices, pos)
-        datos_vertice = mp.get(catalog["vertices_map"], codigo_vertice)
-        if datos_vertice != None:
+        if v is not None:
 
-            if datos_vertice["lat"] != None and datos_vertice["lon"] != None:
+            distancia = haversine(
+                lat_base,
+                lon_base,
+                v["lat"],
+                v["lon"]
+            )
 
-                distancia_actual = haversine(
-                    lat_base,
-                    lon_base,
-                    datos_vertice["lat"],
-                    datos_vertice["lon"]
-                )
+            if distancia <= radio:
 
-                if distancia_actual <= radio:
+                registro = {
+                    "id": v["id"],
+                    "lat": v["lat"],
+                    "lon": v["lon"],
+                    "reg": v["count"],
+                    "vel": v["avg_sog"],
+                    "distancia": round(distancia, 2)
+                }
 
-                    velocidad = datos_vertice["avg_sog"]
-
-                    if velocidad == None:
-                        velocidad = "Unknown"
-
-                    registro = {
-                        "id": datos_vertice["id"],
-                        "lat": datos_vertice["lat"],
-                        "lon": datos_vertice["lon"],
-                        "records_count": datos_vertice["records_count"],
-                        "avg_sog": velocidad,
-                        "distancia": round(distancia_actual, 2)
-                    }
-
-                    al.add_last(respuesta_zonas, registro)
-
-    al.merge_sort(respuesta_zonas, comparar_zonas_req2)
+                al.add_last(respuesta, registro)
 
     return {
         "zona_origen": cluster_id,
         "radio": radio,
-        "total_zonas": al.size(respuesta_zonas),
-        "zonas": respuesta_zonas
+        "total_zonas": al.size(respuesta),
+        "zonas": respuesta
     }
 
 
@@ -395,80 +382,38 @@ def req_4(catalog):
 
 def req_5(catalog, origen, destino):
 
-    grafo_distancias = catalog["g_distance"]
+    graph = catalog["g_distance"]
 
-    if not G.contains_vertex(grafo_distancias, origen):
-        return {"error": f"La zona de origen '{origen}' no existe en el grafo."}
+    if not G.contains_vertex(graph, origen):
+        return {"error": "Origen no existe"}
 
-    if not G.contains_vertex(grafo_distancias, destino):
-        return {"error": f"La zona de destino '{destino}' no existe en el grafo."}
+    if not G.contains_vertex(graph, destino):
+        return {"error": "Destino no existe"}
 
-    estructura_busqueda = bfs.dijkstra(grafo_distancias, origen)
-    existe_camino = bfs.has_path_to(destino, estructura_busqueda)
+    search = bfs.dijkstra(graph, origen)
 
-    if existe_camino == False:
+    if not bfs.has_path_to(destino, search):
         return {
-            "existe_ruta": False,
-            "origen": origen,
-            "destino": destino
+            "existe_ruta": False
         }
-        
-    costo_final = bfs.dist_to(destino, estructura_busqueda)
-    camino_original = bfs.path_to(destino, estructura_busqueda)
-    ruta_ordenada = al.new_list()
-    posicion = al.size(camino_original) - 1
-    
-    while posicion >= 0:
-        elemento = al.get_element(camino_original, posicion)
-        al.add_last(ruta_ordenada, elemento)
-        posicion -= 1
-        
-    total_vertices = al.size(ruta_ordenada)
-    vertices_respuesta = al.new_list()
-    if total_vertices <= 10:
-        for indice in range(total_vertices):
 
-            info = construir_info_vertice_req5(
-                catalog,
-                ruta_ordenada,
-                indice,
-                total_vertices
-            )
+    costo = bfs.dist_to(destino, search)
+    path = bfs.path_to(destino, search)
 
-            al.add_last(vertices_respuesta, info)
+    ruta = al.new_list()
 
-    else:
-
-        for indice in range(5):
-
-            info_inicio = construir_info_vertice_req5(
-                catalog,
-                ruta_ordenada,
-                indice,
-                total_vertices
-            )
-
-            al.add_last(vertices_respuesta, info_inicio)
-        inicio_final = total_vertices - 5
-        
-        for indice in range(inicio_final, total_vertices):
-            info_fin = construir_info_vertice_req5(
-                catalog,
-                ruta_ordenada,
-                indice,
-                total_vertices
-            )
-            al.add_last(vertices_respuesta, info_fin)
+    pos = al.size(path) - 1
+    while pos >= 0:
+        al.add_last(ruta, al.get_element(path, pos))
+        pos -= 1
 
     return {
         "existe_ruta": True,
-        "origen": origen,
-        "destino": destino,
-        "costo_total": round(costo_final, 2),
-        "total_zonas": total_vertices,
-        "total_arcos": total_vertices - 1,
-        "vertices": vertices_respuesta
+        "costo": round(costo, 2),
+        "total": al.size(ruta),
+        "ruta": ruta
     }
+
 
 
 def construir_info_vertice_req5(catalog, ruta, posicion, total):

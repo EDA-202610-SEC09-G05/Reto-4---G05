@@ -2,7 +2,7 @@ import sys
 from tabulate import tabulate
 from App import logic as l
 import DataStructures.Map.map_separate_chaining as mc
-
+import DataStructures.List.array_list as al
 def new_logic():
     """
     Se crea una instancia del controlador inicializando las estructuras del grafo y mapas.
@@ -92,23 +92,79 @@ def print_req_1(control):
     # TODO: Imprimir el resultado del requerimiento 1
     pass
 
-
 def print_req_2(control):
-    """
-        Función que imprime la solución del Requerimiento 2 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 2
-    pass
+
+    cluster = input("Cluster origen: ")
+    radio = float(input("Radio (km): "))
+
+    r = l.req_2(control, cluster, radio)
+
+    if "error" in r:
+        print(r["error"])
+        return
+
+    print("\nRESULTADO REQ 2\n")
+    print(f"Zona: {r['zona_origen']}")
+    print(f"Radio: {r['radio']}")
+    print(f"Total zonas: {r['total_zonas']}\n")
+
+    for i in range(l.al.size(r["zonas"])):
+        z = l.al.get_element(r["zonas"], i)
+
+        print(z["id"], z["distancia"], "km")
 
 
 def print_req_3(control):
-    """
-        Función que imprime la solución del Requerimiento 3 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 3
-    pass
+    catalog = control["catalog"]
+    lista_top = l.req_3(catalog)
+    
+    # Función artesanal para formatear decimales a string
+    def formatear(valor):
+        # Si el valor es inválido, retorna el texto requerido
+        if valor == None:
+            return "Unknown"
+            
+        # Multiplicamos por 100 para trabajar con enteros
+        temp = int(valor * 100)
+        
+        # Obtenemos la parte entera y la parte decimal de dos dígitos
+        entero = temp // 100
+        decimal = temp % 100
+        
+        # Convertimos a texto manualmente
+        entero_str = str(entero)
+        decimal_str = str(decimal)
+        
+        # Si el decimal es menor a 10, le ponemos el cero faltante
+        if decimal < 10:
+            decimal_str = "0" + decimal_str
+            
+        return entero_str + "." + decimal_str
 
-
+    # Recorrido recursivo artesanal
+    def imprimir_recursivo(i):
+        # Usamos el tamaño de tu lista
+        if i < al.size(lista_top):
+            conexion = al.get_element(lista_top, i)
+            
+            # Acceso directo a los valores
+            origen = conexion["source"]
+            destino = conexion["target"]
+            viajes = conexion["trips_count"]
+            distancia = conexion["distance"]
+            tiempo = conexion["avg_time"]
+            
+            # Impresión paso a paso
+            print("Zona de origen: " + str(origen))
+            print("Zona de destino: " + str(destino))
+            print("Número total de viajes: " + str(viajes))
+            print("Distancia: " + formatear(distancia))
+            print("Tiempo promedio: " + formatear(tiempo))
+            print("------------------------------")
+            
+            imprimir_recursivo(i + 1)
+            
+    imprimir_recursivo(0)
 def print_req_4(control):
     """
         Función que imprime la solución del Requerimiento 4 en consola
@@ -118,19 +174,78 @@ def print_req_4(control):
 
 
 def print_req_5(control):
-    """
-        Función que imprime la solución del Requerimiento 5 en consola
-    """
-    # TODO: Imprimir el resultado del requerimiento 5
-    pass
 
+    origen = input("Origen: ")
+    destino = input("Destino: ")
 
+    r = l.req_5(control, origen, destino)
+
+    if "error" in r:
+        print(r["error"])
+        return
+
+    if not r["existe_ruta"]:
+        print("\nNo existe ruta\n")
+        return
+
+    print("\nRUTA ENCONTRADA\n")
+    print(f"Costo: {r['costo']}")
+    print(f"Nodos: {r['total']}\n")
+
+    for i in range(l.al.size(r["ruta"])):
+        print(l.al.get_element(r["ruta"], i))
+        
+        
 def print_req_6(control):
     """
         Función que imprime la solución del Requerimiento 6 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 6
-    pass
+    resultado = l.req_6(control)
+    
+    tamano_resultado = al.size(resultado)
+    if tamano_resultado == 0:
+        print("No se encontraron subredes.")
+        return
+    
+    primer_elemento = al.get_element(resultado, 0)
+    total_subredes = primer_elemento["total_subred"]
+    
+    print(f"\nTotal de subredes encontradas: {total_subredes}")
+    
+    print("\nTop 5 subredes con más zonas de navegación:")
+    
+    subredes_tabla = []
+    for i in range(tamano_resultado):
+        subred = al.get_element(resultado, i)
+        lista_nodos = subred["zonas_ids"]
+        total_nodos = al.size(lista_nodos)
+        
+        if total_nodos <= 8:
+            nodos_mostrar = []
+            for j in range(total_nodos):
+                nodo_id = al.get_element(lista_nodos, j)
+                nodos_mostrar.append(str(nodo_id))
+            nodos_str = ", ".join(nodos_mostrar)
+        else:
+            primeros_3 = []
+            for j in range(3):
+                primeros_3.append(str(al.get_element(lista_nodos, j)))
+            ultimos_3 = []
+            for j in range(total_nodos - 3, total_nodos):
+                ultimos_3.append(str(al.get_element(lista_nodos, j)))
+            nodos_str = ", ".join(primeros_3) + ", ..., " + ", ".join(ultimos_3)
+        
+        subred_info = {
+            "ID subred": subred["subred_id"],
+            "Total zonas": subred["total_zonas"],
+            "ID Zonas": nodos_str,
+            "Velocidad promedio": subred["velocidad_promedio"],
+            "Total viajes": subred["total_viajes"]
+        }
+        subredes_tabla.append(subred_info)
+        
+    print(tabulate(subredes_tabla, headers="keys", tablefmt="fancy_grid", floatfmt="", numalign="left" ))
 
 # Se crea la lógica asociado a la vista
 control = new_logic()

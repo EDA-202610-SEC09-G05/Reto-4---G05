@@ -1,4 +1,4 @@
-from DataStructures.Map import map_linear_probing as map
+from DataStructures.Map import map_separate_chaining as map
 from DataStructures.Graph import vertex as v
 from DataStructures.Graph import edge as e
 
