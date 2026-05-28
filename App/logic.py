@@ -57,7 +57,8 @@ def load_data(catalog, filename):
 
     end = get_time()
 
-    return {"catalog": catalog}, delta_time(start, end)
+    return catalog, delta_time(start, end)
+
 def format_record(row):
 
     return {
