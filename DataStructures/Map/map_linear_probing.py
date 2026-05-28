@@ -1,6 +1,7 @@
 import random
 from DataStructures.Map import map_entry as me
 from DataStructures.Map import map_functions as mf
+from DataStructures.List import array_list as al
 
 
 def new_map(num_elements, load_factor, prime=109345121):
@@ -116,3 +117,12 @@ def remove(my_map, key):
         my_map["current_factor"] = my_map["size"] / my_map["capacity"]
 
     return my_map
+
+def key_set(my_map):
+    llaves = al.new_list()
+    table = my_map["table"]["elements"]
+    for i in range(len(table)):
+        if table[i]["key"] is not None:
+            al.add_last(llaves, table[i]["key"])
+    return llaves
+
