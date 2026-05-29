@@ -3,6 +3,11 @@ from tabulate import tabulate
 from App import logic as l
 import DataStructures.Map.map_separate_chaining as mc
 import DataStructures.List.array_list as al
+from tabulate import tabulate
+from App import logic as l
+from DataStructures.List import array_list as al
+from App.logic import get_time, delta_time
+
 def new_logic():
     """
     Se crea una instancia del controlador inicializando las estructuras del grafo y mapas.
@@ -21,25 +26,31 @@ def load_data(control):
 
     catalog, tiempo = l.load_data(control, filename)
 
-    # ===== RESUMEN =====
     total_vertices = l.G.order(catalog["g_distance"])
     total_edges = l.G.size(catalog["g_distance"])
+    total_mmsi = l.mc.size(catalog["mmsi_map"])
 
-    print("\n========== RESULTADOS ==========\n")
-    print(f"Tiempo de carga: {round(tiempo, 2)} ms")
-    print(f"Total de registros: {catalog['total_records']}")
-    print(f"Total de vértices: {total_vertices}")
-    print(f"Total de arcos: {total_edges}")
+    reporte = [
+        ["Total de embarcaciones reconocidas", total_mmsi],
+        ["Total de registros cargados", catalog["total_records"]],
+        ["Total de vertices del grafo", total_vertices],
+        ["Total de arcos del grafo de distancia", total_edges],
+        ["Tiempo de ejecución (ms)", round(tiempo, 2)]
+    ]
 
-    # ===== PRIMEROS Y ÚLTIMOS =====
-    print("\nPrimeros 5 vértices:")
+    print("\nReporte de la carga de datos:\n")
+    print(tabulate(reporte, headers=["Metrica", "Valor"], tablefmt="grid"))
+
+    print("\nPrimeros y últimos vértices creados:")
+
     show_vertices(catalog, 0, 5)
 
-    print("\nÚltimos 5 vértices:")
     size = l.al.size(catalog["creation_order"])
-    show_vertices(catalog, size-5, size)
-    
+    show_vertices(catalog, size - 5, size)
+
     return catalog
+
+
 
 def show_vertices(catalog, start, end):
 
@@ -171,56 +182,27 @@ def print_req_2(control):
 
 
 def print_req_3(control):
-    catalog = control["catalog"]
-    lista_top = l.req_3(catalog)
-    
-    # Función artesanal para formatear decimales a string
-    def formatear(valor):
-        # Si el valor es inválido, retorna el texto requerido
-        if valor == None:
-            return "Unknown"
-            
-        # Multiplicamos por 100 para trabajar con enteros
-        temp = int(valor * 100)
-        
-        # Obtenemos la parte entera y la parte decimal de dos dígitos
-        entero = temp // 100
-        decimal = temp % 100
-        
-        # Convertimos a texto manualmente
-        entero_str = str(entero)
-        decimal_str = str(decimal)
-        
-        # Si el decimal es menor a 10, le ponemos el cero faltante
-        if decimal < 10:
-            decimal_str = "0" + decimal_str
-            
-        return entero_str + "." + decimal_str
 
-    # Recorrido recursivo artesanal
-    def imprimir_recursivo(i):
-        # Usamos el tamaño de tu lista
-        if i < al.size(lista_top):
-            conexion = al.get_element(lista_top, i)
-            
-            # Acceso directo a los valores
-            origen = conexion["source"]
-            destino = conexion["target"]
-            viajes = conexion["trips_count"]
-            distancia = conexion["distance"]
-            tiempo = conexion["avg_time"]
-            
-            # Impresión paso a paso
-            print("Zona de origen: " + str(origen))
-            print("Zona de destino: " + str(destino))
-            print("Número total de viajes: " + str(viajes))
-            print("Distancia: " + formatear(distancia))
-            print("Tiempo promedio: " + formatear(tiempo))
-            print("------------------------------")
-            
-            imprimir_recursivo(i + 1)
-            
-    imprimir_recursivo(0)
+    n = int(input("Ingrese el número de conexiones: "))
+
+    lista_top = l.req_3(control, n)
+
+    print("\n========== REQ 3: CONEXIONES MÁS FRECUENTES ==========\n")
+
+    filas = []
+
+    for i in range(al.size(lista_top)):
+        arc = al.get_element(lista_top, i)
+
+        filas.append({
+            "Origen": arc.get("origen"),
+            "Destino": arc.get("destino"),
+            "Viajes": arc.get("cantidad_viajes"),
+            "Distancia": arc.get("distancia"),
+            "Tiempo Prom": arc.get("tiempo_promedio")
+        })
+
+    print(tabulate(filas, headers="keys", tablefmt="grid"))
     
 def print_req_4(control):
 
@@ -256,71 +238,131 @@ def print_req_4(control):
     
 def print_req_5(control):
 
-    origen = input("Origen: ")
-    destino = input("Destino: ")
+    print("\n========== REQ 5: RUTA MÁS EFICIENTE ==========\n")
+
+    origen = input("Identificador zona origen: ").strip()
+    destino = input("Identificador zona destino: ").strip()
+
+    start = get_time()
 
     r = l.req_5(control, origen, destino)
 
+    end = get_time()
+
     if "error" in r:
-        print(r["error"])
+        print("\nX", r["error"])
         return
 
     if not r["existe_ruta"]:
-        print("\nNo existe ruta\n")
+        print("\nNo existe ruta entre las zonas indicadas.")
+        print("Tiempo de ejecución (ms):", round(delta_time(start, end), 2))
         return
 
-    print("\nRUTA ENCONTRADA\n")
-    print(f"Costo: {r['costo']}")
-    print(f"Nodos: {r['total']}\n")
+    print("\n Existe ruta entre las zonas\n")
 
-    for i in range(l.al.size(r["ruta"])):
-        print(l.al.get_element(r["ruta"], i))
+    print("Costo total de la ruta:", round(r["costo"], 2), "km")
+    print("Total de zonas:", r["total"])
+    print("Total de arcos:", r["total"] - 1)
+
+    ruta = r["ruta"]
+    total = al.size(ruta)
+
+    if total <= 10:
+        indices = list(range(total))
+    else:
+        indices = list(range(5)) + list(range(total - 5, total))
+
+    tabla = []
+
+    for i in indices:
+
+        info = l.construir_info_vertice_req5(control, ruta, i, total)
+
+        fila = [
+            info["id"],
+            round(info["lat"], 2) if isinstance(info["lat"], float) else "Unknown",
+            round(info["lon"], 2) if isinstance(info["lon"], float) else "Unknown",
+            info["num_embarcaciones"] if info["num_embarcaciones"] is not None else "Unknown",
+            info["peso_arco_sig"]
+        ]
+
+        tabla.append(fila)
+
+    headers = [
+        "ID Zona",
+        "Latitud",
+        "Longitud",
+        "# Embarcaciones",
+        "Peso hacia siguiente (km)"
+    ]
+
+    print("\nDetalle de la ruta (primeros y últimos vértices):\n")
+    print(tabulate(tabla, headers=headers, tablefmt="grid"))
+
+    print("\nTiempo de ejecución (ms):", round(delta_time(start, end), 2))
+
+
         
         
 def print_req_6(control):
 
-    start = l.get_time()
+    print("\n========== REQ 6: CONECTIVIDAD BIDIRECCIONAL ==========\n")
+
+    start = get_time()
 
     resultado = l.req_6(control)
 
-    end = l.get_time()
+    end = get_time()
 
-    size = l.al.size(resultado)
-
-    if size == 0:
-        print("\nNo se encontraron subredes\n")
+    if resultado is None or al.size(resultado) == 0:
+        print("No se encontraron subredes.")
         return
 
-    total = l.al.get_element(resultado, 0)["total_subred"]
+    total = al.get_element(resultado, 0)["total_subredes"]
 
-    print("\n" + "="*60)
-    print("REQ. 6 — Subredes de navegación")
-    print("="*60)
-    print(f"Total de subredes: {total}")
-    print(f"Tiempo ejecución: {round(l.delta_time(start, end), 2)} ms")
-    print("="*60 + "\n")
+    print("Total de subredes:", total)
 
-    filas = []
+    tabla = []
 
-    for i in range(size):
+    for i in range(al.size(resultado)):
+        dato = al.get_element(resultado, i)
 
-        r = l.al.get_element(resultado, i)
-        nodos = r["zonas_ids"]
+        nodos = dato["zonas_ids"]
+        total_nodos = al.size(nodos)
 
-        if len(nodos) <= 6:
-            ids = ", ".join(nodos)
+        mostrar = []
+
+        if total_nodos <= 6:
+            for j in range(total_nodos):
+                mostrar.append(al.get_element(nodos, j))
         else:
-            ids = ", ".join(nodos[:3]) + ", ..., " + ", ".join(nodos[-3:])
+            for j in range(3):
+                mostrar.append(al.get_element(nodos, j))
+            for j in range(total_nodos - 3, total_nodos):
+                mostrar.append(al.get_element(nodos, j))
 
-        filas.append({
-            "Subred": r["subred_id"],
-            "Zonas": r["total_zonas"],
-            "IDs": ids,
-            "Velocidad prom": r["velocidad_promedio"],
-            "Total viajes": r["total_viajes"]
-        })
+        fila = [
+            dato["subred_id"],
+            dato["total_zonas"],
+            ", ".join(mostrar),
+            dato["total_viajes"],
+            dato["velocidad_promedio"]
+        ]
 
-    print(tabulate(filas, headers="keys", tablefmt="grid"))
+        tabla.append(fila)
+
+    headers = [
+        "ID Subred",
+        "Total Zonas",
+        "Zonas (IDs)",
+        "Total Viajes",
+        "Velocidad Promedio"
+    ]
+
+    print("\nSubredes más grandes:\n")
+    print(tabulate(tabla, headers=headers, tablefmt="grid"))
+
+    print("\nTiempo de ejecución (ms):", round(delta_time(start, end), 2))
     
 # Se crea la lógica asociado a la vista
 control = new_logic()

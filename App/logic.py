@@ -145,6 +145,9 @@ def build_edges(catalog):
         mmsi = al.get_element(keys, i)
         records = mc.get(catalog["mmsi_map"], mmsi)
 
+        if records is None or al.size(records) < 2:
+            continue
+
         sort.merge_sort(records, compare_time, al)
 
         for j in range(al.size(records) - 1):
@@ -152,8 +155,15 @@ def build_edges(catalog):
             a = al.get_element(records, j)
             b = al.get_element(records, j + 1)
 
-            if a["cluster"] != b["cluster"]:
-                add_edge_info(catalog, a, b)
+            c1 = a["cluster"]
+            c2 = b["cluster"]
+
+            if c1 == c2:
+                continue
+
+            add_edge_info(catalog, a, b)
+
+            add_edge_info(catalog, b, a)
                 
 def compare_time(a, b):
     return a["time"] < b["time"]
@@ -218,11 +228,16 @@ def build_graphs(catalog):
     for i in range(al.size(keys)):
         vid = al.get_element(keys, i)
 
+        vertex_data = {
+            "value": None,
+            "adjacents": mc.new_map(10, 0.5)
+        }
+
         if not G.contains_vertex(catalog["g_distance"], vid):
-            G.insert_vertex(catalog["g_distance"], vid, None)
+            G.insert_vertex(catalog["g_distance"], vid, vertex_data)
 
         if not G.contains_vertex(catalog["g_time"], vid):
-            G.insert_vertex(catalog["g_time"], vid, None)
+            G.insert_vertex(catalog["g_time"], vid, vertex_data)
 
     ekeys = mc.key_set(catalog["edges_map"])
 
@@ -230,6 +245,9 @@ def build_graphs(catalog):
 
         key = al.get_element(ekeys, i)
         e = mc.get(catalog["edges_map"], key)
+
+        if e is None or e["count"] <= 0:
+            continue
 
         source = e["source"]
         target = e["target"]
@@ -243,6 +261,7 @@ def build_graphs(catalog):
 
         G.add_edge(catalog["g_distance"], source, target, e["distance"])
         G.add_edge(catalog["g_time"], source, target, avg_time)
+
 
 def get_first_3_mmsi(lst):
 
@@ -431,80 +450,114 @@ def comparar_req2(a, b):
 
 
 def req_3(catalog, n):
-    """
-    Retorna el resultado del requerimiento 3 corregido
-    """
-    mapa_arcos = catalog["edges_map"]
-    lista_arcos = mc.value_set(mapa_arcos) 
+
+    lista_arcos = mc.value_set(catalog["edges_map"])
 
     sort.merge_sort(lista_arcos, comparar_arcos_req3, al)
 
     salida = al.new_list()
-    cantidad_total = al.size(lista_arcos)
-    limite = cantidad_total if cantidad_total < n else n
 
-    for indice in range(limite):
-        arco_actual = al.get_element(lista_arcos, indice)
-        distancia_arco = arco_actual["distance"]
-        
-        tiempo_arco = round(arco_actual["time_sum"] / arco_actual["count"], 2) if arco_actual["count"] > 0 else 0
+    limite = min(n, al.size(lista_arcos))
 
-        datos = {
-            "origen": arco_actual["source"],
-            "destino": arco_actual["target"],
-            "cantidad_viajes": arco_actual["count"], # En build_edges usaste "count"
-            "distancia": round(distancia_arco, 2) if distancia_arco is not None else "Unknown",
-            "tiempo_promedio": tiempo_arco
+    for i in range(limite):
+        e = al.get_element(lista_arcos, i)
+
+        tiempo = round(e["time_sum"] / e["count"], 2) if e["count"] > 0 else "Unknown"
+
+        dato = {
+            "origen": e["source"],
+            "destino": e["target"],
+            "cantidad_viajes": e["count"],
+            "distancia": round(e["distance"], 2) if e["distance"] is not None else "Unknown",
+            "tiempo_promedio": tiempo
         }
-        al.add_last(salida, datos)
-        
+
+        al.add_last(salida, dato)
+
     return salida
 
-def comparar_arcos_req3(dato_1, dato_2):
 
-    if dato_1["trips_count"] != dato_2["trips_count"]:
-        return dato_1["trips_count"] > dato_2["trips_count"]
+def comparar_arcos_req3(a, b):
 
-    if dato_1["source"] != dato_2["source"]:
-        return dato_1["source"] < dato_2["source"]
+    if a["count"] != b["count"]:
+        return a["count"] > b["count"]
 
-    return dato_1["target"] < dato_2["target"]
+    if a["source"] != b["source"]:
+        return str(a["source"]) < str(b["source"])
+
+    return str(a["target"]) < str(b["target"])
 
 
 def req_4(catalog):
 
-    origen_id = catalog["req4_origen"]
+    origen = catalog["req4_origen"]
 
-    info_origen = mc.get(catalog["vertices_map"], origen_id)
+    if mc.get(catalog["vertices_map"], origen) is None:
+        return {"error": "Zona no existe"}
 
-    if info_origen is None:
-        return {"error": f"La zona '{origen_id}' no existe"}
+    dist = {}
+    padre = {}
+    visitados = set()
 
-    visited_map = djk.dijkstra(catalog["g_distance"], origen_id)
+    keys = mc.key_set(catalog["vertices_map"])
+
+    for i in range(al.size(keys)):
+        v = al.get_element(keys, i)
+        dist[v] = float("inf")
+        padre[v] = None
+
+    dist[origen] = 0
+
+    while True:
+
+        actual = None
+        min_dist = float("inf")
+
+        for v in dist:
+            if v not in visitados and dist[v] < min_dist:
+                min_dist = dist[v]
+                actual = v
+
+        if actual is None:
+            break
+
+        visitados.add(actual)
+
+        vecinos = G.adjacents(catalog["g_distance"], actual)
+
+        for i in range(al.size(vecinos)):
+            vecino = al.get_element(vecinos, i)
+
+            weight = None
+
+            arco_key = actual + "-" + vecino
+            edge = mc.get(catalog["edges_map"], arco_key)
+
+            if edge:
+                weight = edge["distance"]
+            else:
+                continue
+
+            nuevo = dist[actual] + weight
+
+            if nuevo < dist[vecino]:
+                dist[vecino] = nuevo
+                padre[vecino] = actual
 
     arcos = al.new_list()
     costo_total = 0
 
-    vertices_list = mp.key_set(visited_map)
+    for v in padre:
 
-    for i in range(al.size(vertices_list)):
-        vid = al.get_element(vertices_list, i)
-        data = mp.get(visited_map, vid)
+        p = padre[v]
 
-        if data is None:
-            continue
+        if p is not None:
 
-        edge_from = data.get("edge_from")
-        dist_to = data.get("dist_to", float("inf"))
-
-        if edge_from is not None and dist_to != float("inf"):
-
-            data_from = mp.get(visited_map, edge_from)
-            peso = dist_to - data_from.get("dist_to", 0)
+            peso = dist[v] - dist[p]
 
             arco = {
-                "origen": edge_from,
-                "destino": vid,
+                "origen": p,
+                "destino": v,
                 "peso": round(peso, 2)
             }
 
@@ -522,11 +575,12 @@ def req_4(catalog):
         indices = list(range(5)) + list(range(total_arcos - 5, total_arcos))
 
     arcos_mostrar = al.new_list()
+
     for i in indices:
         al.add_last(arcos_mostrar, al.get_element(arcos, i))
 
     return {
-        "origen": origen_id,
+        "origen": origen,
         "costo_total": round(costo_total, 2),
         "total_zonas": total_zonas,
         "total_arcos": total_arcos,
@@ -544,32 +598,85 @@ def req_5(catalog, origen, destino):
 
     graph = catalog["g_distance"]
 
-    if not G.contains_vertex(graph, origen):
+    if mc.get(catalog["vertices_map"], origen) is None:
         return {"error": "Origen no existe"}
 
-    if not G.contains_vertex(graph, destino):
+    if mc.get(catalog["vertices_map"], destino) is None:
         return {"error": "Destino no existe"}
 
-    search = bfs.dijkstra(graph, origen)
+    dist = {}
+    padre = {}
+    visitados = set()
 
-    if not bfs.has_path_to(destino, search):
+    keys = mc.key_set(catalog["vertices_map"])
+
+    for i in range(al.size(keys)):
+        v = al.get_element(keys, i)
+        dist[v] = float("inf")
+        padre[v] = None
+
+    dist[origen] = 0
+
+    while True:
+
+        actual = None
+        min_dist = float("inf")
+
+        for v in dist:
+            if v not in visitados and dist[v] < min_dist:
+                min_dist = dist[v]
+                actual = v
+
+        if actual is None:
+            break
+
+        if actual == destino:
+            break
+
+        visitados.add(actual)
+
+        vecinos = G.adjacents(graph, actual)
+
+        for i in range(al.size(vecinos)):
+            vecino = al.get_element(vecinos, i)
+
+            # Obtener peso desde edges_map
+            arco_key = actual + "-" + vecino
+            edge = mc.get(catalog["edges_map"], arco_key)
+
+            if edge is None:
+                continue
+
+            peso = edge["distance"]
+
+            nuevo = dist[actual] + peso
+
+            if nuevo < dist[vecino]:
+                dist[vecino] = nuevo
+                padre[vecino] = actual
+
+    if dist[destino] == float("inf"):
         return {
             "existe_ruta": False
         }
 
-    costo = bfs.dist_to(destino, search)
-    path = bfs.path_to(destino, search)
+    camino = []
+    actual = destino
+
+    while actual is not None:
+        camino.append(actual)
+        actual = padre[actual]
+
+    camino.reverse()
 
     ruta = al.new_list()
 
-    pos = al.size(path) - 1
-    while pos >= 0:
-        al.add_last(ruta, al.get_element(path, pos))
-        pos -= 1
+    for v in camino:
+        al.add_last(ruta, v)
 
     return {
         "existe_ruta": True,
-        "costo": round(costo, 2),
+        "costo": round(dist[destino], 2),
         "total": al.size(ruta),
         "ruta": ruta
     }
@@ -577,23 +684,37 @@ def req_5(catalog, origen, destino):
 
 
 def construir_info_vertice_req5(catalog, ruta, posicion, total):
+
     identificador = al.get_element(ruta, posicion)
-    
-    # Cambiado mp por mc y corregido el nombre de las llaves internas según tu new_vertex
+
     info_vertice = mc.get(catalog["vertices_map"], identificador)
-    cantidad_embarcaciones = al.size(info_vertice["mmsi"]) # En new_vertex usaste "mmsi"
-    
-    if posicion == total - 1:
-        peso_siguiente = "N/A (destino final)"
-    else:
-        siguiente = al.get_element(ruta, posicion + 1)
-        llave_arco = identificador + "-" + siguiente
-        # Cambiado mp por mc y "edge_info_map" por "edges_map"
-        informacion_arco = mc.get(catalog["edges_map"], llave_arco)
-        peso_siguiente = round(informacion_arco["distance"], 2) if informacion_arco else "Unknown"
+
+    if info_vertice is None:
+        return {
+            "id": identificador,
+            "lat": "Unknown",
+            "lon": "Unknown",
+            "num_embarcaciones": "Unknown",
+            "peso_arco_sig": "Unknown"
+        }
+
+    cantidad_embarcaciones = al.size(info_vertice["mmsi"]) if info_vertice.get("mmsi") else "Unknown"
 
     latitud = info_vertice.get("lat", "Unknown")
     longitud = info_vertice.get("lon", "Unknown")
+
+    if posicion == total - 1:
+        peso_siguiente = "N/A"
+    else:
+        siguiente = al.get_element(ruta, posicion + 1)
+        llave = identificador + "-" + siguiente
+
+        arco = mc.get(catalog["edges_map"], llave)
+
+        if arco and arco.get("distance") is not None:
+            peso_siguiente = round(arco["distance"], 2)
+        else:
+            peso_siguiente = "Unknown"
 
     return {
         "id": identificador,
@@ -602,135 +723,120 @@ def construir_info_vertice_req5(catalog, ruta, posicion, total):
         "num_embarcaciones": cantidad_embarcaciones,
         "peso_arco_sig": peso_siguiente
     }
-
+    
 def req_6(catalog):
 
     graph = catalog["g_distance"]
-    vertices_keys = mc.key_set(catalog["vertices_map"])
-    total = al.size(vertices_keys)
+    vertices = mc.key_set(catalog["vertices_map"])
+    total = al.size(vertices)
 
-    # --- Paso 1: construir grafo no dirigido (solo arcos bidireccionales) ---
-    # grafo_nd: vid -> array_list de vecinos bidireccionales
     grafo_nd = mc.new_map(total * 2, 0.5)
 
     for i in range(total):
-        vid = al.get_element(vertices_keys, i)
-        if not mc.contains(grafo_nd, vid):
-            mc.put(grafo_nd, vid, al.new_list())
+        v = al.get_element(vertices, i)
+        mc.put(grafo_nd, v, al.new_list())
 
     for i in range(total):
-        a = al.get_element(vertices_keys, i)
+        a = al.get_element(vertices, i)
 
         if not G.contains_vertex(graph, a):
             continue
 
-        adyacentes_a = G.adjacents(graph, a)  # retorna array_list de keys
+        adyacentes = G.adjacents(graph, a)
 
-        if adyacentes_a is None:
-            continue
-
-        for j in range(al.size(adyacentes_a)):
-            b = al.get_element(adyacentes_a, j)
+        for j in range(al.size(adyacentes)):
+            b = al.get_element(adyacentes, j)
 
             if not G.contains_vertex(graph, b):
                 continue
 
-            # Verificar si existe B->A
-            adyacentes_b = G.adjacents(graph, b)
-            tiene_regreso = False
+            # verificar b → a
+            ady_b = G.adjacents(graph, b)
+            bidireccional = False
 
-            if adyacentes_b is not None:
-                for k in range(al.size(adyacentes_b)):
-                    if al.get_element(adyacentes_b, k) == a:
-                        tiene_regreso = True
-                        break
+            for k in range(al.size(ady_b)):
+                if al.get_element(ady_b, k) == a:
+                    bidireccional = True
+                    break
 
-            if tiene_regreso:
-                lista_a = mc.get(grafo_nd, a)
-                if lista_a is None:
-                    lista_a = al.new_list()
-                    mc.put(grafo_nd, a, lista_a)
-                al.add_last(lista_a, b)
+            if bidireccional:
+                al.add_last(mc.get(grafo_nd, a), b)
+                al.add_last(mc.get(grafo_nd, b), a)
 
-                lista_b = mc.get(grafo_nd, b)
-                if lista_b is None:
-                    lista_b = al.new_list()
-                    mc.put(grafo_nd, b, lista_b)
-                al.add_last(lista_b, a)
-
-    # --- Paso 2: BFS sobre grafo no dirigido ---
     visitados = mc.new_map(total * 2, 0.5)
     componentes = al.new_list()
 
     for i in range(total):
-        v = al.get_element(vertices_keys, i)
+        inicio = al.get_element(vertices, i)
 
-        if mc.get(visitados, v) is not None:
+        if mc.get(visitados, inicio) is not None:
             continue
 
         cola = al.new_list()
-        al.add_last(cola, v)
-        mc.put(visitados, v, True)
+        al.add_last(cola, inicio)
+        mc.put(visitados, inicio, True)
 
         nodos = al.new_list()
-        suma_vel = 0.0
-        suma_reg = 0
+        total_viajes = 0
+        suma_vel = 0
 
         while al.size(cola) > 0:
 
             actual = al.get_element(cola, 0)
 
+            # quitar primero (simulación cola)
             nueva = al.new_list()
-            for k in range(1, al.size(cola)):
-                al.add_last(nueva, al.get_element(cola, k))
+            for x in range(1, al.size(cola)):
+                al.add_last(nueva, al.get_element(cola, x))
             cola = nueva
 
             al.add_last(nodos, actual)
 
             info = mc.get(catalog["vertices_map"], actual)
-            if info is not None:
+
+            if info:
+                total_viajes += info.get("count", 0)
                 suma_vel += info.get("avg_sog", 0)
-                suma_reg += info.get("count", 0)
 
             vecinos = mc.get(grafo_nd, actual)
-            if vecinos is None:
-                continue
 
             for j in range(al.size(vecinos)):
                 vecino = al.get_element(vecinos, j)
+
                 if mc.get(visitados, vecino) is None:
                     mc.put(visitados, vecino, True)
                     al.add_last(cola, vecino)
 
         sort.merge_sort(nodos, comparar_ids_ascendente, al)
 
-        size_nodos = al.size(nodos)
-        promedio = round(suma_vel / size_nodos, 2) if size_nodos > 0 else "Unknown"
-        min_id = al.get_element(nodos, 0) if size_nodos > 0 else "0"
+        size = al.size(nodos)
+        promedio = round(suma_vel / size, 2) if size > 0 else "Unknown"
 
-        comp = {
-            "total_zonas": size_nodos,
-            "nodos": nodos,
-            "total_viajes": suma_reg,
-            "velocidad_promedio": promedio,
-            "min_id": min_id
+        componente = {
+            "total_zonas": size,
+            "zonas_ids": nodos,
+            "total_viajes": total_viajes,
+            "velocidad_promedio": promedio
         }
 
-        al.add_last(componentes, comp)
+        al.add_last(componentes, componente)
 
     sort.merge_sort(componentes, comparar_req6, al)
 
-    # --- Paso 3: respuesta ---
+    total_subredes = al.size(componentes)
+
     respuesta = al.new_list()
-    limite = min(5, al.size(componentes))
+
+    limite = min(5, total_subredes)
 
     for i in range(limite):
         c = al.get_element(componentes, i)
+
         al.add_last(respuesta, {
             "subred_id": i + 1,
-            "total_subredes": al.size(componentes),
+            "total_subredes": total_subredes,
             "total_zonas": c["total_zonas"],
-            "zonas_ids": c["nodos"],
+            "zonas_ids": c["zonas_ids"],
             "total_viajes": c["total_viajes"],
             "velocidad_promedio": c["velocidad_promedio"]
         })
@@ -739,11 +845,9 @@ def req_6(catalog):
 
 
 def comparar_req6(a, b):
-
     if a["total_zonas"] != b["total_zonas"]:
         return a["total_zonas"] > b["total_zonas"]
-
-    return str(a["min_id"]) < str(b["min_id"])
+    return str(al.get_element(a["zonas_ids"], 0)) < str(al.get_element(b["zonas_ids"], 0))
 
 
 def comparar_ids_ascendente(valor_1, valor_2):
